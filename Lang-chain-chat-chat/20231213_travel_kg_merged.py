@@ -476,7 +476,8 @@ def unified_retrieve(state: State):
 
     if is_hotel_related:
         print("System: Detected hotel-related query. Running hotel search...")
-        file_path = r"G:\Code\Projects\GWU\24_FA\AML\Final_proj\hotels_sampled.csv" # 请根据实际路径修改
+        #file_path = r"G:\Code\Projects\GWU\24_FA\AML\Final_proj\hotels_sampled.csv" # 请根据实际路径修改
+        file_path = r"G:\Code\Projects\GWU\24_FA\AML\Final_proj\hotels.csv"
         results = run_hotel_search(file_path, state["question"])
 
         if results is not None and len(results) == 1:
