@@ -1,0 +1,301 @@
+import networkx as nx
+import json
+import textwrap
+from typing import List, TypedDict
+import matplotlib.pyplot as plt  # 确保导入 matplotlib
+
+# 定义 State TypedDict
+class State(TypedDict):
+    question: str
+    context: List[str]
+    answer: str
+
+# 初始化 KnowledgeGraph 类
+class KnowledgeGraph:
+    def __init__(self):
+        self.G = nx.Graph()
+        self._initialize_graph()
+
+    def _initialize_graph(self):
+        # 添加城市
+        self.G.add_node("New York City", type="City", country="USA")
+
+        # 添加交通节点
+        transport_places = [
+            {"name": "Grand Central Terminal", "type": "TransportPlace", "transport_type": "Train Station"},
+            {"name": "JFK Airport", "type": "TransportPlace", "transport_type": "Airport"},
+            {"name": "Port Authority Bus Terminal", "type": "TransportPlace", "transport_type": "Bus Terminal"},
+            {"name": "Times Square Subway Station", "type": "TransportPlace", "transport_type": "Subway Station"},
+        ]
+
+        for transport in transport_places:
+            self.G.add_node(transport["name"], type=transport["type"], transport_type=transport["transport_type"])
+            self.G.add_edge("New York City", transport["name"], relationship="HAS_TRANSPORT")
+
+        # 添加景点
+        attractions = [
+            {"name": "Central Park", "category": "Park"},
+            {"name": "Times Square", "category": "Entertainment"},
+            {"name": "Statue of Liberty", "category": "Monument"},
+            {"name": "Empire State Building", "category": "Skyscraper"},
+            {"name": "Metropolitan Museum of Art", "category": "Museum"},
+            {"name": "Brooklyn Bridge", "category": "Bridge"},
+        ]
+
+        for attraction in attractions:
+            self.G.add_node(attraction["name"], type="Attraction", category=attraction["category"])
+            self.G.add_edge("New York City", attraction["name"], relationship="HAS_ATTRACTION")
+
+        # 添加酒店
+        hotels = [
+            {"name": "Collective Governors Island", "type": "Hotel"},
+        ]
+
+        for hotel in hotels:
+            self.G.add_node(hotel["name"], type=hotel["type"])
+            self.G.add_edge("New York City", hotel["name"], relationship="HAS_HOTEL")
+            self.G.add_edge(hotel["name"], "Statue of Liberty", relationship="NEAR")
+
+        # 添加景点与交通的关系
+        attraction_transport = {
+            "Central Park": ["Times Square Subway Station"],
+            "Times Square": ["Times Square Subway Station"],
+            "Statue of Liberty": ["JFK Airport"],
+            "Empire State Building": ["Times Square Subway Station"],
+            "Metropolitan Museum of Art": ["Grand Central Terminal"],
+            "Brooklyn Bridge": ["Port Authority Bus Terminal"],
+        }
+
+        for attraction, transports in attraction_transport.items():
+            for transport in transports:
+                self.G.add_edge(attraction, transport, relationship="NEAR")
+
+    def find_attractions(self, city):
+        attractions = [
+            node for node, attr in self.G.nodes(data=True)
+            if attr.get("type") == "Attraction" and
+            self.G.has_edge(city, node) and
+            self.G.edges[city, node].get("relationship") == "HAS_ATTRACTION"
+        ]
+        return attractions
+
+    def find_transport_places(self, city):
+        transports = [
+            node for node, attr in self.G.nodes(data=True)
+            if attr.get("type") == "TransportPlace" and self.G.has_edge(city, node, relationship="HAS_TRANSPORT")
+        ]
+        return transports
+
+    def find_transport_near_attraction(self, attraction):
+        transports = [
+            neighbor for neighbor in self.G.neighbors(attraction)
+            if self.G.edges[attraction, neighbor]["relationship"] == "NEAR"
+        ]
+        return transports
+
+    def find_attractions_near_transport(self, transport_place):
+        attractions = [
+            neighbor for neighbor in self.G.neighbors(transport_place)
+            if self.G.edges[transport_place, neighbor]["relationship"] == "NEAR"
+        ]
+        return attractions
+
+# 初始化知识图谱
+kg = KnowledgeGraph()
+
+def visualize_graph(kg: KnowledgeGraph):
+    """
+    使用 NetworkX 和 Matplotlib 可视化知识图谱。
+    """
+    G = kg.G  # 获取图数据
+
+    plt.figure(figsize=(15, 10))
+
+    # 根据节点类型定义节点颜色
+    node_colors = []
+    for node, attr in G.nodes(data=True):
+        if attr["type"] == "City":
+            node_colors.append("lightblue")
+        elif attr["type"] == "Attraction":
+            node_colors.append("lightcoral")
+        elif attr["type"] == "TransportPlace":
+            node_colors.append("gold")
+        elif attr["type"] == "Hotel":
+            node_colors.append("lightgreen")  # 新增酒店节点颜色
+        else:
+            node_colors.append("grey")
+
+    # 根据边的关系定义颜色
+    edge_colors = []
+    for u, v, data in G.edges(data=True):
+        relationship = data.get("relationship", "")
+        if relationship == "HAS_ATTRACTION":
+            edge_colors.append("red")
+        elif relationship == "HAS_TRANSPORT":
+            edge_colors.append("blue")
+        elif relationship == "HAS_HOTEL":
+            edge_colors.append("purple")  # 新增HAS_HOTEL关系颜色
+        elif relationship == "NEAR":
+            edge_colors.append("green")
+        else:
+            edge_colors.append("black")
+
+    # 为所有节点生成位置
+    pos = nx.spring_layout(G, k=0.5, seed=42)  # 可根据需要调整 k 值
+
+    # 绘制节点
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.9)
+
+    # 绘制边
+    nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=2)
+
+    # 绘制标签
+    nx.draw_networkx_labels(G, pos, font_size=10, font_family="sans-serif")
+
+    # 创建图例
+    from matplotlib.patches import Patch
+    node_legend_elements = [
+        Patch(facecolor='lightblue', edgecolor='black', label='City'),
+        Patch(facecolor='lightcoral', edgecolor='black', label='Attraction'),
+        Patch(facecolor='gold', edgecolor='black', label='Transport Place'),
+        Patch(facecolor='lightgreen', edgecolor='black', label='Hotel'),  # 新增酒店图例
+    ]
+
+    edge_legend_elements = [
+        Patch(facecolor='red', edgecolor='red', label='HAS_ATTRACTION'),
+        Patch(facecolor='blue', edgecolor='blue', label='HAS_TRANSPORT'),
+        Patch(facecolor='purple', edgecolor='purple', label='HAS_HOTEL'),  # 新增HAS_HOTEL图例
+        Patch(facecolor='green', edgecolor='green', label='NEAR'),
+    ]
+
+    plt.legend(handles=node_legend_elements + edge_legend_elements, loc='upper right')
+
+    plt.title("New York City Tourist Attractions, Transport, and Hotels Knowledge Graph")
+    plt.axis('off')  # 隐藏坐标轴
+    plt.tight_layout()
+    plt.show()
+
+# 用于 LLM 的意图识别（占位）
+def llm_intent_classification(question: str) -> str:
+    question_lower = question.lower()
+    if "attractions" in question_lower and "in" in question_lower:
+        return "attractions_in_city"
+    elif any(phrase in question_lower for phrase in ["how to get to", "how can i get to", "transport to"]):
+        return "transport_to_attraction"
+    elif any(phrase in question_lower for phrase in ["transport places", "transport options", "how to move around"]):
+        return "transport_places_in_city"
+    else:
+        return "unknown"
+
+# 简单的用户输入解析（占位）
+def parse_user_input(user_input, intent):
+    filters = {}
+    words = user_input.lower().split()
+
+    if intent == "attractions_in_city":
+        if "new york city" in user_input.lower():
+            filters["city"] = "New York City"
+
+    elif intent == "transport_to_attraction":
+        for attraction in kg.find_attractions("New York City"):
+            if attraction.lower() in user_input.lower():
+                filters["attraction"] = attraction
+                break
+
+    elif intent == "transport_places_in_city":
+        if "new york city" in user_input.lower():
+            filters["city"] = "New York City"
+
+    return filters
+
+# 从知识图谱检索信息
+def retrieve(state: State, kg: KnowledgeGraph):
+    intent = llm_intent_classification(state["question"])
+    filters = parse_user_input(state["question"], intent)
+
+    if intent == "attractions_in_city":
+        city = filters.get("city", "New York City")
+        attractions = kg.find_attractions(city)
+        if attractions:
+            context = f"Attractions in {city}: {', '.join(attractions)}."
+            state["context"].append(context)
+        else:
+            state["context"].append(f"No attractions found in {city}.")
+
+    elif intent == "transport_to_attraction":
+        attraction = filters.get("attraction", "")
+        if attraction:
+            transports = kg.find_transport_near_attraction(attraction)
+            if transports:
+                context = f"Transport options to {attraction}: {', '.join(transports)}."
+                state["context"].append(context)
+            else:
+                state["context"].append(f"No transport options found near {attraction}.")
+        else:
+            state["context"].append("Attraction not recognized.")
+
+    elif intent == "transport_places_in_city":
+        city = filters.get("city", "New York City")
+        transports = kg.find_transport_places(city)
+        if transports:
+            context = f"Transport places in {city}: {', '.join(transports)}."
+            state["context"].append(context)
+        else:
+            state["context"].append(f"No transport places found in {city}.")
+
+    else:
+        state["context"].append("I'm sorry, I couldn't understand your query. Please try rephrasing.")
+
+    return state
+
+# 生成回答（占位）
+def generate(state: State):
+    if not state["context"]:
+        state["answer"] = "I'm sorry, I couldn't find any relevant information."
+        return state
+
+    context_str = "\n".join(state["context"])
+    prompt_text = f"""
+    You are a travel assistant. Based on the user's question and the following information, provide a helpful answer.
+
+    User Question: "{state['question']}"
+    Retrieved Information:
+    {context_str}
+
+    Answer:
+    """
+    # 此处应替换为实际的 LLM 调用，这里仅返回 context 作为示例
+    state["answer"] = context_str
+    return state
+
+def chat():
+    print("Welcome to the Travel Assistant! Type 'exit' or 'quit' to end the conversation.")
+    state: State = {
+        "question": "",
+        "context": [],
+        "answer": "",
+    }
+
+    while True:
+        user_input = input("User: ")
+        if user_input.lower() in ["exit", "quit"]:
+            print("Travel Assistant: Thank you for using the Travel Assistant. Goodbye!")
+            break
+
+        state["question"] = user_input
+        state["context"] = []  # 清除之前的上下文
+
+        # 检索相关信息
+        state = retrieve(state, kg)
+
+        # 生成并展示答案
+        state = generate(state)
+        print(f"Travel Assistant: {state['answer']}\n")
+
+        state["answer"] = ""
+
+if __name__ == "__main__":
+    # 可视化图形
+    visualize_graph(kg)
+    # 开始聊天
+    chat()
