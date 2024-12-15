@@ -3,8 +3,6 @@
 
 **Integrating LangChain, Knowledge Graphs, and Retrieval-Augmented Generation for Hotel and Attraction Recommendations**
 
-![Project Banner](https://your-image-link.com/banner.png) <!-- Replace with an actual image link if available -->
-
 ## Table of Contents
 
 - [Introduction](#introduction)
